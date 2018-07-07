@@ -46,8 +46,28 @@ public class Bytifier {
 	
 	public Bytifier(Collection<ProtocolTuple> protocols) {
 		this.protocols = Collections.unmodifiableList(new ArrayList<>(protocols));
-		magicNum = this.protocols.hashCode();
-		System.out.println("Bytifier.protocols="+protocols);
+		magicNum = calculateMagicNumber();
+	}
+	
+	protected int calculateMagicNumber() {
+		int magNum = 0;
+		int prime = 37;
+		for (ProtocolTuple tuple : protocols) {
+			Class<?> cls = tuple.cls;
+			magNum += prime * cls.getName().hashCode();
+			
+			ClassProtocol proto = tuple.proto;
+			magNum += prime * proto.getMagicNumber();
+		}
+		return magNum;
+	}
+	
+	public List<ProtocolTuple> getProtocols() {
+		return protocols;
+	}
+	
+	public int getMagicNumber() {
+		return magicNum;
 	}
 	
 	public Object decode(byte[] bytes) {
@@ -62,7 +82,7 @@ public class Bytifier {
 		return result;
 	}
 	
-	protected Object readChunk(DecodeData data) {
+	public Object readChunk(DecodeData data) {
 		ChunkType chunkType = data.readChunkType();
 		switch (chunkType) {
 		case NULL:
@@ -81,7 +101,7 @@ public class Bytifier {
 		}
 	}
 	
-	protected Object readNewObjRef(DecodeData data) {
+	public Object readNewObjRef(DecodeData data) {
 		int objClsIdx = data.readClassIndex();
 		
 		ClassProtocol protocol = protocols.get(objClsIdx).proto;
@@ -92,7 +112,7 @@ public class Bytifier {
 		return obj;
 	}
 	
-	protected Object readValueType(DecodeData data) {
+	public Object readValueType(DecodeData data) {
 		int objClsIdx = data.readClassIndex();
 		ClassProtocol protocol = protocols.get(objClsIdx).proto;
 		Object obj = protocol.create(this, data);
@@ -100,7 +120,7 @@ public class Bytifier {
 		return obj;
 	}
 	
-	protected Object readGenericArray(DecodeData data) {
+	public Object readGenericArray(DecodeData data) {
 		int elemClsIdx = data.readClassIndex();
 		Class<?> elemCls = protocols.get(elemClsIdx).cls;
 		
@@ -120,15 +140,12 @@ public class Bytifier {
 		return data.getBytes();
 	}
 	
-	protected void writeChunk(EncodeData data, Object object, boolean isValueType) {
-		System.out.println("Bytifier.writeChunk="+object);
+	public void writeChunk(EncodeData data, Object object, boolean isValueType) {
 		if (object == null) {
-			System.out.println("writeChunkType(NULL)");
 			data.writeChunkType(ChunkType.NULL);
 		} else {
 			int referenceIdx = data.getReferenceIndexFor(object);
 			if (referenceIdx >= 0) {
-				System.out.println("writeOldReference("+referenceIdx+")");
 				writeOldReference(data, referenceIdx);
 			} else {
 				int protocolIdx = data.getProtocolIndexFor(object);
@@ -136,30 +153,26 @@ public class Bytifier {
 					Class<?> arrayType = object.getClass().getComponentType();
 					protocolIdx = data.getProtocolIndexFor(arrayType);
 					if (arrayType != null && protocolIdx >= 0) {
-						System.out.println("writeGenericArray("+arrayType.getSimpleName()+")");
 						writeGenericArray(data, protocolIdx, object);
 					} else {
-						System.out.println("writeChunkType(ILLEGAL)");
 						data.writeChunkType(ChunkType.ILLEGAL);
 					}
 				} else if (isValueType) {
-					System.out.println("writeValueType()");
 					writeValueType(data, protocolIdx, object);
 				} else {
-					System.out.println("writeNewReference("+object+")");
 					writeNewReference(data, protocolIdx, object);
 				}
 			}
 		}
 	}
 	
-	protected void writeValueType(EncodeData data, int protocolIdx, Object object) {
+	public void writeValueType(EncodeData data, int protocolIdx, Object object) {
 		data.writeChunkType(ChunkType.VALUE_OBJ_TYPE);
 		data.writeClassIndex(protocolIdx);
 		protocols.get(protocolIdx).proto.write(this, data, object);
 	}
 	
-	protected void writeGenericArray(EncodeData data, int protocolIdx, Object object) {
+	public void writeGenericArray(EncodeData data, int protocolIdx, Object object) {
 		data.writeChunkType(ChunkType.GENERIC_ARRAY);
 		data.writeNewReferenceIndex(object);
 		data.writeClassIndex(protocolIdx);
@@ -173,14 +186,14 @@ public class Bytifier {
 		}
 	}
 	
-	protected void writeNewReference(EncodeData data, int protocolIdx, Object object) {
+	public void writeNewReference(EncodeData data, int protocolIdx, Object object) {
 		data.writeChunkType(ChunkType.NEW_OBJ_REF);
 		data.writeNewReferenceIndex(object);
 		data.writeClassIndex(protocolIdx);
 		protocols.get(protocolIdx).proto.write(this, data, object);
 	}
 	
-	protected void writeOldReference(EncodeData data, int referenceIdx) {
+	public void writeOldReference(EncodeData data, int referenceIdx) {
 		data.writeChunkType(ChunkType.READ_OBJ_REF);
 		data.writeOldReferenceIndex(referenceIdx);
 	}

@@ -158,6 +158,19 @@ public class ReflectionClassProtocol implements ClassProtocol {
 		});
 	}
 	
+	@Override
+	public int getMagicNumber() {
+		final int prime = 31;
+		final int[] result = {cls.getName().hashCode()};
+		fields.forEach(field -> {
+			int hashCls = field.getDeclaringClass().getName().hashCode();
+			int hashName = field.getName().hashCode();
+			int hashType = field.getType().hashCode();
+			result[0] += prime * (hashCls + hashName + hashType);
+		});
+		return result[0];
+	}
+	
 	public static interface FieldWriter {
 		public void write(Bytifier bytifier, EncodeData data, Object input, Field field) throws Exception;
 	}

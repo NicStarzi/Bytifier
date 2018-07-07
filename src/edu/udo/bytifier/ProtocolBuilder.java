@@ -3,6 +3,8 @@ package edu.udo.bytifier;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +38,7 @@ public class ProtocolBuilder {
 		clsMap.put(cls, () -> ReflectionClassProtocol.allFieldsOf(cls));
 	}
 	
-	public void defineViaReflectionLimitedToFields(Class<?> cls, String ... fieldNames) {
+	public void defineViaReflectionWithToFields(Class<?> cls, String ... fieldNames) {
 		clsMap.put(cls, () -> ReflectionClassProtocol.withFields(cls, fieldNames));
 	}
 	
@@ -53,9 +55,27 @@ public class ProtocolBuilder {
 		return builder;
 	}
 	
+	public static final List<ProtocolTuple> PRIMITIVE_TYPE_ARRAY_PROTOCOLS =
+			Collections.unmodifiableList(Arrays.asList(new ProtocolTuple[]
+			{
+				new ProtocolTuple(byte[].class, StandardClassProtocols.BYTE_ARRAY_PROTOCOL),
+				new ProtocolTuple(short[].class, StandardClassProtocols.SHORT_ARRAY_PROTOCOL),
+				new ProtocolTuple(int[].class, StandardClassProtocols.INT_ARRAY_PROTOCOL),
+				new ProtocolTuple(long[].class, StandardClassProtocols.LONG_ARRAY_PROTOCOL),
+				new ProtocolTuple(float[].class, StandardClassProtocols.FLOAT_ARRAY_PROTOCOL),
+				new ProtocolTuple(double[].class, StandardClassProtocols.DOUBLE_ARRAY_PROTOCOL),
+				new ProtocolTuple(boolean[].class, StandardClassProtocols.BOOL_ARRAY_PROTOCOL),
+				new ProtocolTuple(char[].class, StandardClassProtocols.CHAR_ARRAY_PROTOCOL),
+			}));
+	
 	public Bytifier build() {
-		List<ProtocolTuple> protocols = new ArrayList<>(clsMap.size());
-		
+		int protocolCount = clsMap.size() + PRIMITIVE_TYPE_ARRAY_PROTOCOLS.size();
+		List<ProtocolTuple> protocols = new ArrayList<>(protocolCount);
+		// add protocols for primitive arrays
+		for (ProtocolTuple tup : PRIMITIVE_TYPE_ARRAY_PROTOCOLS) {
+			protocols.add(tup);
+		}
+		// add user defined protocols
 		for (Entry<Class<?>, Supplier<ClassProtocol>> entry : clsMap.entrySet()) {
 			Class<?> cls = entry.getKey();
 			ClassProtocol prot = entry.getValue().get();

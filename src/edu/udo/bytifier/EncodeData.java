@@ -65,19 +65,19 @@ public class EncodeData {
 		pos = 0;
 	}
 	
-	protected int getProtocolIndexFor(Class<?> clazz) {
+	public int getProtocolIndexFor(Class<?> clazz) {
 		return protocolIdxMap.getOrDefault(clazz, -1);
 	}
 	
-	protected int getProtocolIndexFor(Object object) {
+	public int getProtocolIndexFor(Object object) {
 		return protocolIdxMap.getOrDefault(object.getClass(), -1);
 	}
 	
-	protected int getReferenceIndexFor(Object object) {
+	public int getReferenceIndexFor(Object object) {
 		return refMap.getOrDefault(object, -1);
 	}
 	
-	public byte[] getBytes() {
+	public byte[] getBytes(boolean writeRefCount) {
 		// size of each buffer
 		int bufSize = byteBuf.length;
 		// byteBufList can be null if we only needed a single buffer
@@ -95,11 +95,16 @@ public class EncodeData {
 		}
 		// write the byteBuf to out up to the position pos
 		System.arraycopy(byteBuf, 0, out, outPos, pos);
-		// write the current reference count to out
-		// Always written to a constant location
-		EncodeData.writeInt4(out, 4 + 1, refMap.size());
-		
+		if (writeRefCount) {
+			// write the current reference count to out
+			// Always written to a constant location
+			EncodeData.writeInt4(out, 4 + 1, refMap.size());
+		}
 		return out;
+	}
+	
+	public byte[] getBytes() {
+		return getBytes(true);
 	}
 	
 	public void writeIntForSize(int maxValue, int value) {
@@ -151,7 +156,7 @@ public class EncodeData {
 		}
 	}
 	
-	private void writePrimitives(int length) {
+	protected void writePrimitives(int length) {
 		writeBytes(primitiveBuf, 0, length);
 	}
 	

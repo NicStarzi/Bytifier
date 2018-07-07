@@ -44,7 +44,7 @@ class EncodingTest {
 		encoder.writeIntForSize(maxValue, value);
 		Assertions.assertEquals(pos + expectedBytes, encoder.getPos());
 		
-		DecodeData decoder = new DecodeData(encoder.getBuf(), false);
+		DecodeData decoder = new DecodeData(encoder.getBytes(false), false);
 		Assertions.assertEquals(value, decoder.readIntForSize(maxValue));
 	}
 	
@@ -80,7 +80,7 @@ class EncodingTest {
 		Assertions.assertEquals(pos + length, encoder.getPos());
 		
 		byte[] expected = Arrays.copyOfRange(arr, offset, offset + length);
-		byte[] written = Arrays.copyOfRange(encoder.getBuf(), 0, 0 + encoder.getPos());
+		byte[] written = encoder.getBytes(false);
 		Assertions.assertArrayEquals(expected, written);
 	}
 	
