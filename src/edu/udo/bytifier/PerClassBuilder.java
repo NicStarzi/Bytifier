@@ -20,9 +20,15 @@ public class PerClassBuilder<CLS_T> {
 	protected final Class<CLS_T> cls;
 	protected boolean useFieldHash = false;
 	protected int fieldHash = 0;
+	protected boolean computeMagNum = true;
+	protected int magicNumber = 0;
 	
 	public PerClassBuilder(Class<CLS_T> clazz) {
 		cls = clazz;
+	}
+	
+	protected int computeMagicNumber() {
+		return calculateFieldHash(cls);
 	}
 	
 	protected int calculateFieldHash(Class<?> classToTest) {
@@ -40,6 +46,17 @@ public class PerClassBuilder<CLS_T> {
 			curCls = curCls.getSuperclass();
 		}
 		return hash;
+	}
+	
+	public PerClassBuilder<CLS_T> setMagicNumber(int value) {
+		magicNumber = value;
+		computeMagNum = false;
+		return this;
+	}
+	
+	public PerClassBuilder<CLS_T> setAutoComputeMagicNumber(boolean value) {
+		computeMagNum = value;
+		return this;
 	}
 	
 	public PerClassBuilder<CLS_T> useFieldHashing(boolean value) {
@@ -203,6 +220,10 @@ public class PerClassBuilder<CLS_T> {
 			}
 			final Constructor<CLS_T> constructor = cls.getConstructor(constrParamTypes);
 			int fieldHash = this.fieldHash;
+			if (computeMagNum) {
+				magicNumber = computeMagicNumber();
+			}
+			final int magNum = magicNumber;
 			
 			return new ClassProtocol() {
 				@Override
@@ -240,6 +261,10 @@ public class PerClassBuilder<CLS_T> {
 					} catch (Exception e) {
 						throw new RuntimeException(e);
 					}
+				}
+				@Override
+				public int getMagicNumber() {
+					return magNum;
 				}
 			};
 		} catch (Exception e) {
