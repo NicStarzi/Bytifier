@@ -14,7 +14,7 @@ import edu.udo.bytifier.DecodeData;
 import edu.udo.bytifier.EncodeData;
 import edu.udo.bytifier.StandardClassProtocols;
 
-class ProtocolTest {
+class ChunkTest {
 	
 	static class EmptyClass{}
 	static class ClassWithPrimitiveAttributes {
@@ -104,8 +104,47 @@ class ProtocolTest {
 	}
 	
 	@Test
-	void testDecode() {
-		Assertions.fail("Not yet implemented");
+	void testEncodeDecode() {
+		EmptyClass ec1 = new EmptyClass();
+		EmptyClass ec2 = new EmptyClass();
+		
+		Object[] arr1 = {ec2, ec1, null, ec1};
+		
+		Object[][] outerArr = {
+			arr1,
+			new ClassWithPrimitiveAttributes[] {new ClassWithPrimitiveAttributes()},
+			new EmptyClass[] {ec1, null, ec2},
+			arr1,
+			{},
+		};
+		
+		byte[] encoded = bytifier.encode(outerArr);
+		Object decoded = bytifier.decode(encoded);
+		
+		Assertions.assertNotNull(decoded);
+		Assertions.assertEquals(Object[][].class, decoded.getClass());
+		
+		Object[][] result = (Object[][]) decoded;
+		int len = outerArr.length;
+		Assertions.assertEquals(len, result.length);
+		for (int i = 0; i < len; i++) {
+			Object[] expInner = outerArr[i];
+			Object[] actInner = result[i];
+			
+			int lenInner = expInner.length;
+			Assertions.assertEquals(lenInner, actInner.length);
+			Assertions.assertEquals(expInner.getClass(), actInner.getClass());
+			for (int j = 0; j < lenInner; j++) {
+				Object exp = expInner[j];
+				Object act = actInner[j];
+				
+				if (exp == null) {
+					Assertions.assertSame(exp, act);
+				} else {
+					Assertions.assertEquals(exp.getClass(), act.getClass());
+				}
+			}
+		}
 	}
 	
 	@Test
@@ -182,40 +221,81 @@ class ProtocolTest {
 	
 	@Test
 	void testReadGenericArray() {
+		/*
+		 * We write a two-dimensional object array containing three one-dimensional object arrays
+		 * and a null reference to the byte stream and attempt to decode it.
+		 */
 		int magicNum = bytifier.getMagicNumber();
 		encoder.writeInt4(magicNum);//magic number
 		encoder.writeInt1(1);// number of bytes to encode class index
-		encoder.writeInt4(3);// number of references.
+		encoder.writeInt4(5);// number of references. (outer array, filled array, empty array, 2 elements of filled array}
 		// chunk for generic array with element type object
 		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
 		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
+		encoder.writeInt1(2);// dimension of outer array (2 dimensional)
+		encoder.writeInt3(4);// length of outer array {arr1, emptyArr, null, arr1}
+		// chunk for first (arr1) generic array with element type object
+		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
+		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
+		encoder.writeInt1(1);// dimension of array (1 dimensional)
 		encoder.writeInt3(3);// length of array
-		// chunk for a new instance of EmptyClass
+		// chunk for a new instance of EmptyClass (element of arr1)
 		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
 		encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
-		// chunk for null pointer
+		// chunk for null pointer (element of arr1)
 		encoder.writeChunkType(ChunkType.NULL);
-		// chunk for a new instance of Object
+		// chunk for a new instance of Object (element of arr1)
 		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
 		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
+		// chunk for second (empty) generic array with element type object
+		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
+		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
+		encoder.writeInt1(1);// dimension of array (1 dimensional)
+		encoder.writeInt3(0);// length of array
+		// chunk for null pointer
+		encoder.writeChunkType(ChunkType.NULL);
+		// chunk for reference to arr1
+		encoder.writeChunkType(ChunkType.READ_OBJ_REF);
+		encoder.writeClassIndex(1);// see table
 		
 		// we write the reference count by hand
 		byte[] bytes = encoder.getBytes(false);
 		Object result = bytifier.decode(bytes);
 		
 		Assertions.assertNotNull(result);
-		Assertions.assertEquals(Object[].class, result.getClass());
+		Assertions.assertEquals(Object[][].class, result.getClass());
 		
-		Object[] arr = (Object[]) result;
-		Assertions.assertEquals(3, arr.length);
+		Object[][] outerArr = (Object[][]) result;
+		Assertions.assertEquals(4, outerArr.length);
 		
-		Assertions.assertNotNull(arr[0]);
-		Assertions.assertEquals(EmptyClass.class, arr[0].getClass());
+		Assertions.assertNotNull(outerArr[0]);
+		Assertions.assertEquals(Object[].class, outerArr[0].getClass());
 		
-		Assertions.assertNull(arr[1]);
+		// arr1
+		Object[] arr1 = outerArr[0];
+		Assertions.assertEquals(3, arr1.length);
 		
-		Assertions.assertNotNull(arr[2]);
-		Assertions.assertEquals(Object.class, arr[2].getClass());
+		Assertions.assertNotNull(arr1[0]);
+		Assertions.assertEquals(EmptyClass.class, arr1[0].getClass());
+		
+		Assertions.assertNull(arr1[1]);
+		
+		Assertions.assertNotNull(arr1[2]);
+		Assertions.assertEquals(Object.class, arr1[2].getClass());
+		
+		// empty arr
+		Assertions.assertNotNull(outerArr[1]);
+		Assertions.assertEquals(Object[].class, outerArr[1].getClass());
+		
+		Object[] emptyArr = outerArr[1];
+		Assertions.assertEquals(0, emptyArr.length);
+		
+		// null ref
+		Assertions.assertNull(outerArr[2]);
+		
+		// ref to arr1
+		Assertions.assertNotNull(outerArr[3]);
+		Assertions.assertSame(arr1, outerArr[3]);
 	}
 	
 	@Test
@@ -247,6 +327,7 @@ class ProtocolTest {
 		// chunk for generic object array
 		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
 		encoder.writeInt1(0);// class index for Object.class
+		encoder.writeInt1(1);// write dimension of array (1 dimensional)
 		encoder.writeInt3(2);// write array length
 		// chunk for c1
 		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
@@ -312,6 +393,7 @@ class ProtocolTest {
 		// chunk for generic array
 		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
 		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
+		encoder.writeInt1(1);// dimension of array (1 dimensional)
 		encoder.writeInt3(arr.length);// array length
 		
 		// chunk for first null reference
@@ -352,6 +434,7 @@ class ProtocolTest {
 		// chunk for generic array
 		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
 		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
+		encoder.writeInt1(1);// dimension of array (1 dimensional)
 		encoder.writeInt3(arr.length);// array length
 		
 		// chunk for first EmptyClass instance

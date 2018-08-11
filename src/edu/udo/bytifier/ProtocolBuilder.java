@@ -12,8 +12,22 @@ import java.util.Map.Entry;
 import java.util.function.Supplier;
 
 import edu.udo.bytifier.Bytifier.ProtocolTuple;
+import edu.udo.bytifier.protocols.PrimitiveArrays;
 
 public class ProtocolBuilder {
+	
+	public static final List<ProtocolTuple> PRIMITIVE_TYPE_ARRAY_PROTOCOLS =
+		Collections.unmodifiableList(Arrays.asList(new ProtocolTuple[]
+		{
+			new ProtocolTuple(byte[].class, PrimitiveArrays.BYTE_ARRAY_PROTOCOL),
+			new ProtocolTuple(short[].class, PrimitiveArrays.SHORT_ARRAY_PROTOCOL),
+			new ProtocolTuple(int[].class, PrimitiveArrays.INT_ARRAY_PROTOCOL),
+			new ProtocolTuple(long[].class, PrimitiveArrays.LONG_ARRAY_PROTOCOL),
+			new ProtocolTuple(float[].class, PrimitiveArrays.FLOAT_ARRAY_PROTOCOL),
+			new ProtocolTuple(double[].class, PrimitiveArrays.DOUBLE_ARRAY_PROTOCOL),
+			new ProtocolTuple(boolean[].class, PrimitiveArrays.BOOL_ARRAY_PROTOCOL),
+			new ProtocolTuple(char[].class, PrimitiveArrays.CHAR_ARRAY_PROTOCOL),
+		}));
 	
 	protected final Map<Class<?>, Supplier<ClassProtocol>> clsMap = new HashMap<>();
 	
@@ -54,19 +68,6 @@ public class ProtocolBuilder {
 		clsMap.put(cls, builder::build);
 		return builder;
 	}
-	
-	public static final List<ProtocolTuple> PRIMITIVE_TYPE_ARRAY_PROTOCOLS =
-			Collections.unmodifiableList(Arrays.asList(new ProtocolTuple[]
-			{
-				new ProtocolTuple(byte[].class, StandardClassProtocols.BYTE_ARRAY_PROTOCOL),
-				new ProtocolTuple(short[].class, StandardClassProtocols.SHORT_ARRAY_PROTOCOL),
-				new ProtocolTuple(int[].class, StandardClassProtocols.INT_ARRAY_PROTOCOL),
-				new ProtocolTuple(long[].class, StandardClassProtocols.LONG_ARRAY_PROTOCOL),
-				new ProtocolTuple(float[].class, StandardClassProtocols.FLOAT_ARRAY_PROTOCOL),
-				new ProtocolTuple(double[].class, StandardClassProtocols.DOUBLE_ARRAY_PROTOCOL),
-				new ProtocolTuple(boolean[].class, StandardClassProtocols.BOOL_ARRAY_PROTOCOL),
-				new ProtocolTuple(char[].class, StandardClassProtocols.CHAR_ARRAY_PROTOCOL),
-			}));
 	
 	public Bytifier build() {
 		int protocolCount = clsMap.size() + PRIMITIVE_TYPE_ARRAY_PROTOCOLS.size();

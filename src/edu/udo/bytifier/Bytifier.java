@@ -7,6 +7,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import edu.udo.bytifier.protocols.ProtocolUtil;
+
 public class Bytifier {
 	
 	public static final byte CHUNK_TYPE_NULL = 0;
@@ -123,13 +125,18 @@ public class Bytifier {
 	public Object readGenericArray(DecodeData data) {
 		int elemClsIdx = data.readClassIndex();
 		Class<?> elemCls = protocols.get(elemClsIdx).cls;
+		int dim = data.readInt1();
+		for (int i = 1; i < dim; i++) {
+			elemCls = Array.newInstance(elemCls, 0).getClass();
+		}
 		
 		int len = data.readInt3();
-		Object[] arr = (Object[]) Array.newInstance(elemCls, len);
+		Object arr = Array.newInstance(elemCls, len);
 		data.setObjectReference(arr);
 		
 		for (int i = 0; i < len; i++) {
-			arr[i] = readChunk(data);
+			Object elem = readChunk(data);
+			Array.set(arr, i, elem);
 		}
 		return arr;
 	}
@@ -150,11 +157,12 @@ public class Bytifier {
 			} else {
 				int protocolIdx = data.getProtocolIndexFor(object);
 				if (protocolIdx < 0) {
-					Class<?> arrayType = object.getClass().getComponentType();
+					Class<?> arrayType = ProtocolUtil.getArrayElementType(object);
 					protocolIdx = data.getProtocolIndexFor(arrayType);
 					if (arrayType != null && protocolIdx >= 0) {
 						writeGenericArray(data, protocolIdx, object);
 					} else {
+						System.out.println("Bytifier.writeChunk(ILLEGAL) object="+object);
 						data.writeChunkType(ChunkType.ILLEGAL);
 					}
 				} else if (isValueType) {
@@ -176,12 +184,16 @@ public class Bytifier {
 		data.writeChunkType(ChunkType.GENERIC_ARRAY);
 		data.writeNewReferenceIndex(object);
 		data.writeClassIndex(protocolIdx);
-		
-		Object[] arr = (Object[]) object;
-		int len = arr.length;
+		// write the dimension of the generic array as 1 byte (max = 256)
+		int dim = ProtocolUtil.getArrayDimension(object);
+		data.writeInt1(dim);
+		// write the length of the generic array with 3 bytes (max = 2^48)
+//		Object[] arr = (Object[]) object;
+		int len = Array.getLength(object);
 		data.writeInt3(len);
 		
-		for (Object elem : arr) {
+		for (int i = 0; i < len; i++) {
+			Object elem = Array.get(object, i);
 			writeChunk(data, elem, false);
 		}
 	}
