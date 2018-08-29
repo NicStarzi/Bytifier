@@ -8,7 +8,7 @@ public interface ClassProtocol {
 	
 	public void read(Bytifier bytifier, DecodeData data, Object object);
 	
-	public default int getMagicNumber() {
+	public default int getIdentificationNumber() {
 		return getClass().getName().hashCode();
 	}
 	

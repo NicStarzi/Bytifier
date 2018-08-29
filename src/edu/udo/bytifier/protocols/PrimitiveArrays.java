@@ -29,7 +29,7 @@ public class PrimitiveArrays {
 			}
 		}
 		@Override
-		public int getMagicNumber() {
+		public int getIdentificationNumber() {
 			return 0xFEED000A;
 		}
 	};
@@ -55,7 +55,7 @@ public class PrimitiveArrays {
 			}
 		}
 		@Override
-		public int getMagicNumber() {
+		public int getIdentificationNumber() {
 			return 0xFEED000B;
 		}
 	};
@@ -81,7 +81,7 @@ public class PrimitiveArrays {
 			}
 		}
 		@Override
-		public int getMagicNumber() {
+		public int getIdentificationNumber() {
 			return 0xFEED000C;
 		}
 	};
@@ -107,7 +107,7 @@ public class PrimitiveArrays {
 			}
 		}
 		@Override
-		public int getMagicNumber() {
+		public int getIdentificationNumber() {
 			return 0xFEED000D;
 		}
 	};
@@ -133,7 +133,7 @@ public class PrimitiveArrays {
 			}
 		}
 		@Override
-		public int getMagicNumber() {
+		public int getIdentificationNumber() {
 			return 0xFEED000E;
 		}
 	};
@@ -159,7 +159,7 @@ public class PrimitiveArrays {
 			}
 		}
 		@Override
-		public int getMagicNumber() {
+		public int getIdentificationNumber() {
 			return 0xFEED000F;
 		}
 	};
@@ -185,7 +185,7 @@ public class PrimitiveArrays {
 			}
 		}
 		@Override
-		public int getMagicNumber() {
+		public int getIdentificationNumber() {
 			return 0xFEED00A0;
 		}
 	};
@@ -211,7 +211,7 @@ public class PrimitiveArrays {
 			}
 		}
 		@Override
-		public int getMagicNumber() {
+		public int getIdentificationNumber() {
 			return 0xFEED00AA;
 		}
 	};

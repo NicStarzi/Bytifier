@@ -13,7 +13,7 @@ public class DecodeData {
 	protected final byte[] bytes;
 	protected final Object[] refMap;
 	protected final int clsSize;
-	protected final int magicNum;
+	protected final int protoID;
 	protected int pos;
 	protected int lastRefIdx;
 	
@@ -25,7 +25,7 @@ public class DecodeData {
 		bytes = byteArr;
 		pos = 0;
 		if (readDefaults) {
-			magicNum = readInt4();
+			protoID = readInt4();
 			clsSize = readInt1();
 			
 			int refCount = readInt4();
@@ -35,15 +35,15 @@ public class DecodeData {
 				refMap = new Object[refCount];
 			}
 		} else {
-			magicNum = 0;
+			protoID = 0;
 			clsSize = 0;
 			refMap = null;
 		}
 	}
 	
 	protected void printDebug() {
-		byte[] bla = getBytes();
-		System.out.println("pos="+pos+"; bytes="+Arrays.toString(bla));
+		byte[] bytes = getBytes();
+		System.out.println("pos="+pos+"; bytes="+Arrays.toString(bytes));
 	}
 	
 	public static int calculateByteCountFor(int value) {
@@ -59,8 +59,8 @@ public class DecodeData {
 		return 4;
 	}
 	
-	public int getMagicNumber() {
-		return magicNum;
+	public int getProtocolIdentificationNumber() {
+		return protoID;
 	}
 	
 	public boolean hasMoreData() {

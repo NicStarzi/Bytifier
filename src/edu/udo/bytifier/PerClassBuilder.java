@@ -1,7 +1,5 @@
 package edu.udo.bytifier;
 
-import static edu.udo.bytifier.StandardClassProtocols.STRING_UTF8_PROTOCOL;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -12,19 +10,27 @@ import java.util.function.Predicate;
 import java.util.function.ToDoubleFunction;
 import java.util.function.ToIntFunction;
 
+import edu.udo.bytifier.protocols.StringProtocol;
+
 public class PerClassBuilder<CLS_T> {
 	
 	protected final List<WriteAction> writeActions = new ArrayList<>();
 	protected final List<ReadAction> readActions = new ArrayList<>();
 	protected final List<ConstructorData> constrData = new ArrayList<>();
 	protected final Class<CLS_T> cls;
+	protected final ProtocolBuilder bldr;
 	protected boolean useFieldHash = false;
 	protected int fieldHash = 0;
 	protected boolean computeMagNum = true;
 	protected int magicNumber = 0;
 	
-	public PerClassBuilder(Class<CLS_T> clazz) {
+	public PerClassBuilder(ProtocolBuilder builder, Class<CLS_T> clazz) {
+		bldr = builder;
 		cls = clazz;
+	}
+	
+	public ProtocolBuilder endDefinition() {
+		return bldr;
 	}
 	
 	protected int computeMagicNumber() {
@@ -50,7 +56,7 @@ public class PerClassBuilder<CLS_T> {
 	
 	public PerClassBuilder<CLS_T> setMagicNumber(int value) {
 		magicNumber = value;
-		computeMagNum = false;
+		setAutoComputeMagicNumber(false);
 		return this;
 	}
 	
@@ -72,11 +78,11 @@ public class PerClassBuilder<CLS_T> {
 					@SuppressWarnings("unchecked")
 					CLS_T obj = (CLS_T) input;
 					String val = getter.apply(obj);
-					STRING_UTF8_PROTOCOL.write(bytifier, data, val);
+					StringProtocol.STRING_UTF8_PROTOCOL.write(bytifier, data, val);
 				},
 				(bytifier, data) -> {
-					String val = (String) STRING_UTF8_PROTOCOL.create(bytifier, data);
-					STRING_UTF8_PROTOCOL.read(bytifier, data, val);
+					String val = (String) StringProtocol.STRING_UTF8_PROTOCOL.create(bytifier, data);
+					StringProtocol.STRING_UTF8_PROTOCOL.read(bytifier, data, val);
 					return val;
 				}));
 		return this;
@@ -128,13 +134,13 @@ public class PerClassBuilder<CLS_T> {
 			@SuppressWarnings("unchecked")
 			CLS_T obj = (CLS_T) input;
 			String val = getter.apply(obj);
-			STRING_UTF8_PROTOCOL.write(bytifier, data, val);
+			StringProtocol.STRING_UTF8_PROTOCOL.write(bytifier, data, val);
 		});
 		readActions.add(
 				(bytifier, data, object) ->
 		{
-			String val = (String) STRING_UTF8_PROTOCOL.create(bytifier, data);
-			STRING_UTF8_PROTOCOL.read(bytifier, data, val);
+			String val = (String) StringProtocol.STRING_UTF8_PROTOCOL.create(bytifier, data);
+			StringProtocol.STRING_UTF8_PROTOCOL.read(bytifier, data, val);
 			@SuppressWarnings("unchecked")
 			CLS_T obj = (CLS_T) object;
 			setter.accept(obj, val);
@@ -202,11 +208,45 @@ public class PerClassBuilder<CLS_T> {
 		return this;
 	}
 	
-	public <REF_T> PerClassBuilder<CLS_T> addObjectByValue(Function<CLS_T, REF_T> getter, BiConsumer<CLS_T, REF_T> setter) {
+	public <REF_T> PerClassBuilder<CLS_T> addFieldValueObject(Function<CLS_T, REF_T> getter, BiConsumer<CLS_T, REF_T> setter) {
+		writeActions.add(
+				(bytifier, data, input) ->
+		{
+			@SuppressWarnings("unchecked")
+			CLS_T obj = (CLS_T) input;
+			REF_T val = getter.apply(obj);
+			bytifier.writeChunk(data, val, true);
+		});
+		readActions.add(
+				(bytifier, data, object) ->
+		{
+			@SuppressWarnings("unchecked")
+			REF_T val = (REF_T) bytifier.readChunk(data);
+			@SuppressWarnings("unchecked")
+			CLS_T obj = (CLS_T) object;
+			setter.accept(obj, val);
+		});
 		return this;
 	}
 	
-	public <REF_T> PerClassBuilder<CLS_T> addObjectByReference(Function<CLS_T, REF_T> getter, BiConsumer<CLS_T, REF_T> setter) {
+	public <REF_T> PerClassBuilder<CLS_T> addFieldReferencedObject(Function<CLS_T, REF_T> getter, BiConsumer<CLS_T, REF_T> setter) {
+		writeActions.add(
+				(bytifier, data, input) ->
+		{
+			@SuppressWarnings("unchecked")
+			CLS_T obj = (CLS_T) input;
+			REF_T val = getter.apply(obj);
+			bytifier.writeChunk(data, val, false);
+		});
+		readActions.add(
+				(bytifier, data, object) ->
+		{
+			@SuppressWarnings("unchecked")
+			REF_T val = (REF_T) bytifier.readChunk(data);
+			@SuppressWarnings("unchecked")
+			CLS_T obj = (CLS_T) object;
+			setter.accept(obj, val);
+		});
 		return this;
 	}
 	
@@ -218,7 +258,8 @@ public class PerClassBuilder<CLS_T> {
 			for (ConstructorData data : constrData) {
 				constrParamTypes[idx++] = data.type;
 			}
-			final Constructor<CLS_T> constructor = cls.getConstructor(constrParamTypes);
+			final Constructor<CLS_T> constructor = cls.getDeclaredConstructor(constrParamTypes);
+			constructor.setAccessible(true);
 			int fieldHash = this.fieldHash;
 			if (computeMagNum) {
 				magicNumber = computeMagicNumber();
@@ -263,7 +304,7 @@ public class PerClassBuilder<CLS_T> {
 					}
 				}
 				@Override
-				public int getMagicNumber() {
+				public int getIdentificationNumber() {
 					return magNum;
 				}
 			};

@@ -1,4 +1,4 @@
-package edu.udo.bytifier;
+package edu.udo.bytifier.protocols;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -7,6 +7,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+
+import edu.udo.bytifier.Bytifier;
+import edu.udo.bytifier.ClassProtocol;
+import edu.udo.bytifier.DecodeData;
+import edu.udo.bytifier.EncodeData;
 
 public class ReflectionClassProtocol implements ClassProtocol {
 	
@@ -159,14 +164,14 @@ public class ReflectionClassProtocol implements ClassProtocol {
 	}
 	
 	@Override
-	public int getMagicNumber() {
+	public int getIdentificationNumber() {
 		final int prime = 31;
 		final int[] result = {cls.getName().hashCode()};
 		fields.forEach(field -> {
 			int hashCls = field.getDeclaringClass().getName().hashCode();
 			int hashName = field.getName().hashCode();
 			int hashType = field.getType().hashCode();
-			result[0] += prime * (hashCls + hashName + hashType);
+			result[0] += prime * hashCls + prime * hashName + prime * hashType;
 		});
 		return result[0];
 	}

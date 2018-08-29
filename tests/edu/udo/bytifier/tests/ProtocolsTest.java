@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 
 import edu.udo.bytifier.Bytifier;
 import edu.udo.bytifier.ProtocolBuilder;
-import edu.udo.bytifier.protocols.ProtocolUtil;
 
 class ProtocolsTest {
 	
@@ -17,13 +16,8 @@ class ProtocolsTest {
 	@BeforeEach
 	void setup() {
 		ProtocolBuilder protoBld = new ProtocolBuilder();
-		protoBld.setStringCharset(StandardCharsets.UTF_8);
+		protoBld.setStringEncodingCharset(StandardCharsets.UTF_8);
 		bytifier = protoBld.build();
-	}
-	
-	@Test
-	void testArrayDimension() {
-		ProtocolUtil.getArrayDimension(new Object[0]);
 	}
 	
 	@Test

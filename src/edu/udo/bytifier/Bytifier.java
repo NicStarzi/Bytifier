@@ -8,13 +8,9 @@ import java.util.Collections;
 import java.util.List;
 
 import edu.udo.bytifier.protocols.ProtocolUtil;
+import edu.udo.bytifier.protocols.UnknownClassProtocol;
 
 public class Bytifier {
-	
-	public static final byte CHUNK_TYPE_NULL = 0;
-	public static final byte CHUNK_TYPE_OBJ_BY_VALUE = 1;
-	public static final byte CHUNK_TYPE_NEW_OBJ_REF = 2;
-	public static final byte CHUNK_TYPE_READ_OBJ_REF = 3;
 	
 	public static class ProtocolTuple {
 		public final Class<?> cls;
@@ -36,7 +32,9 @@ public class Bytifier {
 		}
 	}
 	protected final List<ProtocolTuple> protocols;
-	protected final int magicNum;
+	protected final int protoID;
+	protected UnknownObjectTypeReaction unknownReaction = UnknownObjectTypeReaction.WRITE_AND_WARNING;
+	protected UnknownClassProtocol ucp = new UnknownClassProtocol();
 	
 	public Bytifier() {
 		this(Collections.emptyList());
@@ -48,10 +46,10 @@ public class Bytifier {
 	
 	public Bytifier(Collection<ProtocolTuple> protocols) {
 		this.protocols = Collections.unmodifiableList(new ArrayList<>(protocols));
-		magicNum = calculateMagicNumber();
+		protoID = calculateProtocolIdentificationNumber();
 	}
 	
-	protected int calculateMagicNumber() {
+	protected int calculateProtocolIdentificationNumber() {
 		int magNum = 0;
 		int prime = 37;
 		for (ProtocolTuple tuple : protocols) {
@@ -59,7 +57,7 @@ public class Bytifier {
 			magNum += prime * cls.getName().hashCode();
 			
 			ClassProtocol proto = tuple.proto;
-			magNum += prime * proto.getMagicNumber();
+			magNum += prime * proto.getIdentificationNumber();
 		}
 		return magNum;
 	}
@@ -68,14 +66,48 @@ public class Bytifier {
 		return protocols;
 	}
 	
-	public int getMagicNumber() {
-		return magicNum;
+	public void setReactionToUnknownObjectTypes(UnknownObjectTypeReaction value) {
+		if (value == null) {
+			throw new IllegalArgumentException("value must not be 'null'");
+		}
+		unknownReaction = value;
+		if (unknownReaction == UnknownObjectTypeReaction.WRITE
+				|| unknownReaction == UnknownObjectTypeReaction.WRITE_AND_WARNING)
+		{
+			if (ucp == null) {
+				ucp = new UnknownClassProtocol();
+			}
+		} else {
+			ucp = null;
+		}
+	}
+	
+	public UnknownObjectTypeReaction getReactionToUnknownObjectTypes() {
+		return unknownReaction;
+	}
+	
+	public Class<?> getClassForIndex(int classIndex) {
+		if (classIndex < 0 || classIndex >= protocols.size()) {
+			return null;
+		}
+		return protocols.get(classIndex).cls;
+	}
+	
+	public ClassProtocol getProtocolForIndex(int classIndex) {
+		if (classIndex < 0 || classIndex >= protocols.size()) {
+			return null;
+		}
+		return protocols.get(classIndex).proto;
+	}
+	
+	public int getProtocolIdentificationNumber() {
+		return protoID;
 	}
 	
 	public Object decode(byte[] bytes) {
 		DecodeData data = new DecodeData(bytes);
-		if (magicNum != data.getMagicNumber()) {
-			System.err.println("magicNum="+magicNum+"; readMagicNumber="+data.getMagicNumber());
+		if (protoID != data.getProtocolIdentificationNumber()) {
+			System.err.println("magicNum="+protoID+"; readMagicNumber="+data.getProtocolIdentificationNumber());
 		}
 		Object result = readChunk(data);
 		if (data.hasMoreData()) {
@@ -92,11 +124,13 @@ public class Bytifier {
 		case NEW_OBJ_REF:
 			return readNewObjRef(data);
 		case READ_OBJ_REF:
-			return data.readObjectReference();
+			return readOldObjRef(data);
 		case VALUE_OBJ_TYPE:
 			return readValueType(data);
 		case GENERIC_ARRAY:
 			return readGenericArray(data);
+		case UNKNOWN_OBJ:
+			return readUnknownObject(data);
 		case ILLEGAL:
 		default:
 			throw new IllegalArgumentException("chunkType="+chunkType);
@@ -106,7 +140,7 @@ public class Bytifier {
 	public Object readNewObjRef(DecodeData data) {
 		int objClsIdx = data.readClassIndex();
 		
-		ClassProtocol protocol = protocols.get(objClsIdx).proto;
+		ClassProtocol protocol = getProtocolForIndex(objClsIdx);
 		Object obj = protocol.create(this, data);
 		data.setObjectReference(obj);
 		protocol.read(this, data, obj);
@@ -114,9 +148,13 @@ public class Bytifier {
 		return obj;
 	}
 	
+	public Object readOldObjRef(DecodeData data) {
+		return data.readObjectReference();
+	}
+	
 	public Object readValueType(DecodeData data) {
 		int objClsIdx = data.readClassIndex();
-		ClassProtocol protocol = protocols.get(objClsIdx).proto;
+		ClassProtocol protocol = getProtocolForIndex(objClsIdx);
 		Object obj = protocol.create(this, data);
 		protocol.read(this, data, obj);
 		return obj;
@@ -124,7 +162,7 @@ public class Bytifier {
 	
 	public Object readGenericArray(DecodeData data) {
 		int elemClsIdx = data.readClassIndex();
-		Class<?> elemCls = protocols.get(elemClsIdx).cls;
+		Class<?> elemCls = getClassForIndex(elemClsIdx);
 		int dim = data.readInt1();
 		for (int i = 1; i < dim; i++) {
 			elemCls = Array.newInstance(elemCls, 0).getClass();
@@ -139,6 +177,13 @@ public class Bytifier {
 			Array.set(arr, i, elem);
 		}
 		return arr;
+	}
+	
+	public Object readUnknownObject(DecodeData data) {
+		Object obj = ucp.create(this, data);
+		data.setObjectReference(obj);
+		ucp.read(this, data, obj);
+		return obj;
 	}
 	
 	public byte[] encode(Object objectGraph) {
@@ -162,8 +207,7 @@ public class Bytifier {
 					if (arrayType != null && protocolIdx >= 0) {
 						writeGenericArray(data, protocolIdx, object);
 					} else {
-						System.out.println("Bytifier.writeChunk(ILLEGAL) object="+object);
-						data.writeChunkType(ChunkType.ILLEGAL);
+						beforeUnknownObjectWrite(data, object);
 					}
 				} else if (isValueType) {
 					writeValueType(data, protocolIdx, object);
@@ -177,7 +221,7 @@ public class Bytifier {
 	public void writeValueType(EncodeData data, int protocolIdx, Object object) {
 		data.writeChunkType(ChunkType.VALUE_OBJ_TYPE);
 		data.writeClassIndex(protocolIdx);
-		protocols.get(protocolIdx).proto.write(this, data, object);
+		getProtocolForIndex(protocolIdx).write(this, data, object);
 	}
 	
 	public void writeGenericArray(EncodeData data, int protocolIdx, Object object) {
@@ -188,7 +232,6 @@ public class Bytifier {
 		int dim = ProtocolUtil.getArrayDimension(object);
 		data.writeInt1(dim);
 		// write the length of the generic array with 3 bytes (max = 2^48)
-//		Object[] arr = (Object[]) object;
 		int len = Array.getLength(object);
 		data.writeInt3(len);
 		
@@ -202,11 +245,44 @@ public class Bytifier {
 		data.writeChunkType(ChunkType.NEW_OBJ_REF);
 		data.writeNewReferenceIndex(object);
 		data.writeClassIndex(protocolIdx);
-		protocols.get(protocolIdx).proto.write(this, data, object);
+		getProtocolForIndex(protocolIdx).write(this, data, object);
 	}
 	
 	public void writeOldReference(EncodeData data, int referenceIdx) {
 		data.writeChunkType(ChunkType.READ_OBJ_REF);
 		data.writeOldReferenceIndex(referenceIdx);
+	}
+	
+	public void writeUnknownObject(EncodeData data, Object object) {
+		data.writeChunkType(ChunkType.UNKNOWN_OBJ);
+		data.writeNewReferenceIndex(object);
+		
+		ucp.write(this, data, object);
+	}
+	
+	protected void beforeUnknownObjectWrite(EncodeData data, Object object) {
+		switch (unknownReaction) {
+		case EXCEPTION:
+			throw new IllegalArgumentException(
+					"The type of the following object is not part of the protocol: "
+						+object.getClass().getName()+": "+object);
+		case WRITE_AND_WARNING:
+			System.err.println(
+					"The type of the following object is not part of the protocol: "
+						+object.getClass().getName()+": "+object);
+			//$FALL-THROUGH$
+		case WRITE:
+			writeUnknownObject(data, object);
+			break;
+		case WRITE_NULL:
+			data.writeChunkType(ChunkType.NULL);
+			break;
+		default:
+			throw new IllegalStateException(
+					"The selected "
+					+UnknownObjectTypeReaction.class.getSimpleName()
+					+" is not supported: "
+					+unknownReaction);
+		}
 	}
 }

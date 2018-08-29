@@ -45,7 +45,7 @@ public class EncodeData {
 		}
 		
 		if (writeDefaults) {
-			writeInt4(bytifier.magicNum);
+			writeInt4(bytifier.protoID);
 			writeInt1(clsSize);
 			writeInt4(0);// place holder for reference count. Written to at a later time.
 		}
