@@ -12,11 +12,16 @@ import edu.udo.bytifier.Bytifier;
 import edu.udo.bytifier.ClassProtocol;
 import edu.udo.bytifier.DecodeData;
 import edu.udo.bytifier.EncodeData;
+import edu.udo.bytifier.ValueType;
 
 public class ReflectionClassProtocol implements ClassProtocol {
 	
 	protected static final FieldWriter DEFAULT_FIELD_WRITER =
-			(bytifier, data, input, field) -> bytifier.writeChunk(data, field.get(input), false);
+			(bytifier, data, input, field) -> {
+				boolean valueType = field.getAnnotation(ValueType.class) != null
+						||field.getType().getAnnotation(ValueType.class) != null;
+				bytifier.writeChunk(data, field.get(input), valueType);
+			};
 	protected static final Map<Class<?>, FieldWriter> FIELD_TYPE_WRITE_ACTIONS = new HashMap<>();
 	static {
 		FIELD_TYPE_WRITE_ACTIONS.put(Character.TYPE,
@@ -125,6 +130,7 @@ public class ReflectionClassProtocol implements ClassProtocol {
 	protected ReflectionClassProtocol(Class<?> clazz, Collection<Field> selectedFields) {
 		cls = clazz;
 		fields = new ArrayList<>(selectedFields);
+		fields.sort((f1, f2) -> f1.getName().compareTo(f2.getName()));
 		fields.forEach(field -> field.setAccessible(true));
 	}
 	

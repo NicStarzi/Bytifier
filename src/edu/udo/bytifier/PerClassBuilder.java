@@ -21,8 +21,8 @@ public class PerClassBuilder<CLS_T> {
 	protected final ProtocolBuilder bldr;
 	protected boolean useFieldHash = false;
 	protected int fieldHash = 0;
-	protected boolean computeMagNum = true;
-	protected int magicNumber = 0;
+	protected boolean computeIdfNum = true;
+	protected int idfNum = 0;
 	
 	public PerClassBuilder(ProtocolBuilder builder, Class<CLS_T> clazz) {
 		bldr = builder;
@@ -54,14 +54,14 @@ public class PerClassBuilder<CLS_T> {
 		return hash;
 	}
 	
-	public PerClassBuilder<CLS_T> setMagicNumber(int value) {
-		magicNumber = value;
-		setAutoComputeMagicNumber(false);
+	public PerClassBuilder<CLS_T> setProtocolIdentificationNumber(int value) {
+		idfNum = value;
+		setAutoComputeProtocolIdentificationNumber(false);
 		return this;
 	}
 	
-	public PerClassBuilder<CLS_T> setAutoComputeMagicNumber(boolean value) {
-		computeMagNum = value;
+	public PerClassBuilder<CLS_T> setAutoComputeProtocolIdentificationNumber(boolean value) {
+		computeIdfNum = value;
 		return this;
 	}
 	
@@ -261,10 +261,10 @@ public class PerClassBuilder<CLS_T> {
 			final Constructor<CLS_T> constructor = cls.getDeclaredConstructor(constrParamTypes);
 			constructor.setAccessible(true);
 			int fieldHash = this.fieldHash;
-			if (computeMagNum) {
-				magicNumber = computeMagicNumber();
+			if (computeIdfNum) {
+				idfNum = computeMagicNumber();
 			}
-			final int magNum = magicNumber;
+			final int magNum = idfNum;
 			
 			return new ClassProtocol() {
 				@Override
@@ -290,7 +290,7 @@ public class PerClassBuilder<CLS_T> {
 					if (useFieldHash) {
 						int readFieldHash = data.readInt4();
 						if (fieldHash != readFieldHash) {
-							throw new IllegalArgumentException("readFieldHash="+readFieldHash+"; fieldHash="+fieldHash);
+							throw new IllegalArgumentException("expectedFieldHash="+fieldHash+"; readFieldHash="+readFieldHash);
 						}
 					}
 					try {

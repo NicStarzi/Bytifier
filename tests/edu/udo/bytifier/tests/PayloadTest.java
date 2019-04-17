@@ -5,12 +5,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import edu.udo.bytifier.Bytifier;
-import edu.udo.bytifier.Bytifier.ProtocolTuple;
 import edu.udo.bytifier.ClassProtocol;
 import edu.udo.bytifier.DecodeData;
 import edu.udo.bytifier.EncodeData;
+import edu.udo.bytifier.ProtocolTuple;
 import edu.udo.bytifier.debug.DebugBytifier;
 import edu.udo.bytifier.protocols.ObjectProtocol;
+import edu.udo.bytifier.tests.data.EmptyClass;
+import edu.udo.bytifier.tests.data.LinkedClass;
 
 class PayloadTest {
 	
@@ -56,6 +58,21 @@ class PayloadTest {
 		
 		bytifier = new Bytifier(tupObj, tupEmpty, tupLinked);
 		encoder = new EncodeData(bytifier, false);
+	}
+	
+	@Test
+	void testSelfReference() {
+		LinkedClass lc = new LinkedClass();
+		lc.next = lc;
+		
+		byte[] encoded = bytifier.encode(lc);
+		Object decoded = bytifier.decode(encoded);
+		
+		Assertions.assertNotNull(decoded);
+		Assertions.assertEquals(lc.getClass(), decoded.getClass());
+		
+		LinkedClass result = (LinkedClass) decoded;
+		Assertions.assertSame(result, result.next);
 	}
 	
 	@Test

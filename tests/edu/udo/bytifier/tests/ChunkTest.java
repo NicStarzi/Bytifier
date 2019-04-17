@@ -7,14 +7,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import edu.udo.bytifier.Bytifier;
-import edu.udo.bytifier.Bytifier.ProtocolTuple;
 import edu.udo.bytifier.ChunkType;
 import edu.udo.bytifier.ClassProtocol;
 import edu.udo.bytifier.DecodeData;
 import edu.udo.bytifier.EncodeData;
+import edu.udo.bytifier.ProtocolTuple;
 import edu.udo.bytifier.UnknownObjectTypeReaction;
 import edu.udo.bytifier.debug.DebugBytifier;
 import edu.udo.bytifier.protocols.ObjectProtocol;
+import edu.udo.bytifier.tests.data.ClassWithPrimitiveAttributes;
+import edu.udo.bytifier.tests.data.EmptyClass;
 
 class ChunkTest {
 	
@@ -143,6 +145,37 @@ class ChunkTest {
 	}
 	
 	@Test
+	void testEncode() {
+		EmptyClass c1 = new EmptyClass();
+		ClassWithPrimitiveAttributes c2 = new ClassWithPrimitiveAttributes();
+		Object[] arr = {c1, c2};
+		byte[] result = bytifier.encode(arr);
+		
+		int magicNum = bytifier.getProtocolIdentificationNumber();
+		encoder.writeInt4(magicNum);//magic number
+		encoder.writeInt1(1);// number of bytes to encode class index
+		encoder.writeInt4(3);// number of references. {arr, c1, c2}
+		// chunk for generic object array
+		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
+		encoder.writeInt1(0);// class index for Object.class
+		encoder.writeInt1(1);// write dimension of array (1 dimensional)
+		encoder.writeInt3(2);// write array length
+		// chunk for c1
+		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
+		encoder.writeInt1(1);// class index for EmptyClass.class
+		// chunk for c2
+		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
+		encoder.writeInt1(2);// class index for EmptyClass.class
+		encoder.writeInt4(c2.i);
+		encoder.writeFloat4(c2.f);
+		encoder.writeInt8(c2.l);
+		encoder.writeFloat8(c2.d);
+		
+		byte[] expected = encoder.getBytes(false);
+		Assertions.assertArrayEquals(expected, result);
+	}
+	
+	@Test
 	void testReadChunkNull() {
 		int magicNum = bytifier.getProtocolIdentificationNumber();
 		encoder.writeInt4(magicNum);//magic number
@@ -154,6 +187,21 @@ class ChunkTest {
 		byte[] bytes = encoder.getBytes(false);
 		Object result = bytifier.decode(bytes);
 		Assertions.assertNull(result);
+	}
+	
+	@Test
+	void testWriteChunkNull() {
+		byte[] result = bytifier.encode(null);
+		
+		int magicNum = bytifier.getProtocolIdentificationNumber();
+		encoder.writeInt4(magicNum);//magic number
+		encoder.writeInt1(1);// number of bytes to encode class index
+		encoder.writeInt4(0);// number of references.
+		// chunk for null pointer
+		encoder.writeChunkType(ChunkType.NULL);
+		
+		byte[] expected = encoder.getBytes(false);
+		Assertions.assertArrayEquals(expected, result);
 	}
 	
 	@Test
@@ -170,6 +218,75 @@ class ChunkTest {
 		Object result = bytifier.decode(bytes);
 		Assertions.assertNotNull(result);
 		Assertions.assertEquals(EmptyClass.class, result.getClass());
+	}
+	
+	@Test
+	void testWriteNewReference() {
+		byte[] result = bytifier.encode(new EmptyClass());
+		
+		int magicNum = bytifier.getProtocolIdentificationNumber();
+		encoder.writeInt4(magicNum);//magic number
+		encoder.writeInt1(1);// number of bytes to encode class index
+		encoder.writeInt4(1);// number of references.
+		// chunk for EmptyClass instance
+		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
+		// the encoder and the bytifier must have synchronized protocol lists for this to work!
+		encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
+		// the empty class does not contain any data, so here is nothing more to add
+		
+		byte[] expected = encoder.getBytes(false);
+		Assertions.assertArrayEquals(expected, result);
+	}
+	
+	@Test
+	void testWriteOldReference() {
+		/*
+		 * This test can only work if the writeGenericArray test has been successful!
+		 */
+		EmptyClass ec1 = new EmptyClass();
+		EmptyClass ec2 = new EmptyClass();
+		Object[] arr = {ec1, ec2, ec1, ec2, ec1};
+		byte[] result = bytifier.encode(arr);
+		/*
+		 * Reference Table:
+		 * Index		Object
+		 * 0			Object[] arr
+		 * 1			EmptyClass ec1
+		 * 2			EmptyClass ec2
+		 */
+		
+		int magicNum = bytifier.getProtocolIdentificationNumber();
+		encoder.writeInt4(magicNum);//magic number
+		encoder.writeInt1(1);// number of bytes to encode class index
+		encoder.writeInt4(3);// number of references. The array and two instances of EmptyClass.
+		// chunk for generic array
+		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
+		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
+		encoder.writeInt1(1);// dimension of array (1 dimensional)
+		encoder.writeInt3(arr.length);// array length
+		
+		// chunk for first EmptyClass instance
+		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
+		encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
+		
+		// chunk for second EmptyClass instance
+		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
+		encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
+		
+		// chunk for reference to first EmptyClassInstance
+		encoder.writeChunkType(ChunkType.READ_OBJ_REF);
+		encoder.writeClassIndex(1);// see table
+		
+		// chunk for reference to second EmptyClassInstance
+		encoder.writeChunkType(ChunkType.READ_OBJ_REF);
+		encoder.writeClassIndex(2);// see table
+		
+		// chunk for reference to first EmptyClassInstance
+		encoder.writeChunkType(ChunkType.READ_OBJ_REF);
+		encoder.writeClassIndex(1);// see table
+		
+		byte[] expected = encoder.getBytes(false);
+		Assertions.assertArrayEquals(expected, result);
 	}
 	
 	@Test
@@ -212,6 +329,39 @@ class ChunkTest {
 				Assertions.assertNotSame(wrapper.arr[j], wrapper.arr[i]);
 			}
 		}
+	}
+	
+	@Test
+	void testWriteValueType() {
+		/*
+		 * This test can only work if the writeGenericArray test has been successful!
+		 */
+		ValueTypeArrayWrapper wrapper = new ValueTypeArrayWrapper();
+		EmptyClass ec1 = new EmptyClass();
+		EmptyClass ec2 = new EmptyClass();
+		wrapper.arr = new Object[] {ec1, ec2, ec1, ec2, ec1};
+		byte[] result = bytifier.encode(wrapper);
+		
+		int magicNum = bytifier.getProtocolIdentificationNumber();
+		encoder.writeInt4(magicNum);//magic number
+		encoder.writeInt1(1);// number of bytes to encode class index
+		encoder.writeInt4(1);// number of references. Only the instance of ValueTypeArrayWrapper.
+		// The array and the two instances of EmptyClass should not get references.
+		// chunk for ValueTypeArrayWrapper instance
+		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
+		encoder.writeClassIndex(encoder.getProtocolIndexFor(ValueTypeArrayWrapper.class));
+		// index for Object array within wrapper
+		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
+		encoder.writeInt3(wrapper.arr.length);// array length
+		
+		// chunks for EmptyClass instances/references
+		for (int i = 0; i < wrapper.arr.length; i++) {
+			encoder.writeChunkType(ChunkType.VALUE_OBJ_TYPE);
+			encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
+		}
+		
+		byte[] expected = encoder.getBytes(false);
+		Assertions.assertArrayEquals(expected, result);
 	}
 	
 	@Test
@@ -294,85 +444,6 @@ class ChunkTest {
 	}
 	
 	@Test
-	void testClassProtocolIndices() {
-		testClassProtocolIndex(Object.class, 0);
-		testClassProtocolIndex(EmptyClass.class, 1);
-		testClassProtocolIndex(ClassWithPrimitiveAttributes.class, 2);
-	}
-	
-	private void testClassProtocolIndex(Class<?> cls, int expectedIndex) {
-		int idx = encoder.getProtocolIndexFor(cls);
-		Assertions.assertTrue(idx >= 0 && idx < bytifier.getProtocols().size());
-		Class<?> clsFromBytifier = bytifier.getProtocols().get(idx).cls;
-		Assertions.assertEquals(cls, clsFromBytifier);
-		Assertions.assertEquals(expectedIndex, idx);
-	}
-	
-	@Test
-	void testEncode() {
-		EmptyClass c1 = new EmptyClass();
-		ClassWithPrimitiveAttributes c2 = new ClassWithPrimitiveAttributes();
-		Object[] arr = {c1, c2};
-		byte[] result = bytifier.encode(arr);
-		
-		int magicNum = bytifier.getProtocolIdentificationNumber();
-		encoder.writeInt4(magicNum);//magic number
-		encoder.writeInt1(1);// number of bytes to encode class index
-		encoder.writeInt4(3);// number of references. {arr, c1, c2}
-		// chunk for generic object array
-		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
-		encoder.writeInt1(0);// class index for Object.class
-		encoder.writeInt1(1);// write dimension of array (1 dimensional)
-		encoder.writeInt3(2);// write array length
-		// chunk for c1
-		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
-		encoder.writeInt1(1);// class index for EmptyClass.class
-		// chunk for c2
-		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
-		encoder.writeInt1(2);// class index for EmptyClass.class
-		encoder.writeInt4(c2.i);
-		encoder.writeFloat4(c2.f);
-		encoder.writeInt8(c2.l);
-		encoder.writeFloat8(c2.d);
-		
-		byte[] expected = encoder.getBytes(false);
-		Assertions.assertArrayEquals(expected, result);
-	}
-	
-	@Test
-	void testWriteChunkNull() {
-		byte[] result = bytifier.encode(null);
-		
-		int magicNum = bytifier.getProtocolIdentificationNumber();
-		encoder.writeInt4(magicNum);//magic number
-		encoder.writeInt1(1);// number of bytes to encode class index
-		encoder.writeInt4(0);// number of references.
-		// chunk for null pointer
-		encoder.writeChunkType(ChunkType.NULL);
-		
-		byte[] expected = encoder.getBytes(false);
-		Assertions.assertArrayEquals(expected, result);
-	}
-	
-	@Test
-	void testWriteNewReference() {
-		byte[] result = bytifier.encode(new EmptyClass());
-		
-		int magicNum = bytifier.getProtocolIdentificationNumber();
-		encoder.writeInt4(magicNum);//magic number
-		encoder.writeInt1(1);// number of bytes to encode class index
-		encoder.writeInt4(1);// number of references.
-		// chunk for EmptyClass instance
-		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
-		// the encoder and the bytifier must have synchronized protocol lists for this to work!
-		encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
-		// the empty class does not contain any data, so here is nothing more to add
-		
-		byte[] expected = encoder.getBytes(false);
-		Assertions.assertArrayEquals(expected, result);
-	}
-	
-	@Test
 	void testWriteGenericArray() {
 		/*
 		 * This test can only work if the writeChunkNull and writeNewReference
@@ -406,87 +477,18 @@ class ChunkTest {
 	}
 	
 	@Test
-	void testWriteOldReference() {
-		/*
-		 * This test can only work if the writeGenericArray test has been successful!
-		 */
-		EmptyClass ec1 = new EmptyClass();
-		EmptyClass ec2 = new EmptyClass();
-		Object[] arr = {ec1, ec2, ec1, ec2, ec1};
-		byte[] result = bytifier.encode(arr);
-		/*
-		 * Reference Table:
-		 * Index		Object
-		 * 0			Object[] arr
-		 * 1			EmptyClass ec1
-		 * 2			EmptyClass ec2
-		 */
-		
-		int magicNum = bytifier.getProtocolIdentificationNumber();
-		encoder.writeInt4(magicNum);//magic number
-		encoder.writeInt1(1);// number of bytes to encode class index
-		encoder.writeInt4(3);// number of references. The array and two instances of EmptyClass.
-		// chunk for generic array
-		encoder.writeChunkType(ChunkType.GENERIC_ARRAY);
-		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
-		encoder.writeInt1(1);// dimension of array (1 dimensional)
-		encoder.writeInt3(arr.length);// array length
-		
-		// chunk for first EmptyClass instance
-		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
-		encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
-		
-		// chunk for second EmptyClass instance
-		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
-		encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
-		
-		// chunk for reference to first EmptyClassInstance
-		encoder.writeChunkType(ChunkType.READ_OBJ_REF);
-		encoder.writeClassIndex(1);// see table
-		
-		// chunk for reference to second EmptyClassInstance
-		encoder.writeChunkType(ChunkType.READ_OBJ_REF);
-		encoder.writeClassIndex(2);// see table
-		
-		// chunk for reference to first EmptyClassInstance
-		encoder.writeChunkType(ChunkType.READ_OBJ_REF);
-		encoder.writeClassIndex(1);// see table
-		
-		byte[] expected = encoder.getBytes(false);
-		Assertions.assertArrayEquals(expected, result);
+	void testClassProtocolIndices() {
+		testClassProtocolIndex(Object.class, 0);
+		testClassProtocolIndex(EmptyClass.class, 1);
+		testClassProtocolIndex(ClassWithPrimitiveAttributes.class, 2);
 	}
 	
-	@Test
-	void testWriteValueType() {
-		/*
-		 * This test can only work if the writeGenericArray test has been successful!
-		 */
-		ValueTypeArrayWrapper wrapper = new ValueTypeArrayWrapper();
-		EmptyClass ec1 = new EmptyClass();
-		EmptyClass ec2 = new EmptyClass();
-		wrapper.arr = new Object[] {ec1, ec2, ec1, ec2, ec1};
-		byte[] result = bytifier.encode(wrapper);
-		
-		int magicNum = bytifier.getProtocolIdentificationNumber();
-		encoder.writeInt4(magicNum);//magic number
-		encoder.writeInt1(1);// number of bytes to encode class index
-		encoder.writeInt4(1);// number of references. Only the instance of ValueTypeArrayWrapper.
-		// The array and the two instances of EmptyClass should not get references.
-		// chunk for ValueTypeArrayWrapper instance
-		encoder.writeChunkType(ChunkType.NEW_OBJ_REF);
-		encoder.writeClassIndex(encoder.getProtocolIndexFor(ValueTypeArrayWrapper.class));
-		// index for Object array within wrapper
-		encoder.writeClassIndex(encoder.getProtocolIndexFor(Object.class));
-		encoder.writeInt3(wrapper.arr.length);// array length
-		
-		// chunks for EmptyClass instances/references
-		for (int i = 0; i < wrapper.arr.length; i++) {
-			encoder.writeChunkType(ChunkType.VALUE_OBJ_TYPE);
-			encoder.writeClassIndex(encoder.getProtocolIndexFor(EmptyClass.class));
-		}
-		
-		byte[] expected = encoder.getBytes(false);
-		Assertions.assertArrayEquals(expected, result);
+	private void testClassProtocolIndex(Class<?> cls, int expectedIndex) {
+		int idx = encoder.getProtocolIndexFor(cls);
+		Assertions.assertTrue(idx >= 0 && idx < bytifier.getProtocols().size());
+		Class<?> clsFromBytifier = bytifier.getProtocols().get(idx).cls;
+		Assertions.assertEquals(cls, clsFromBytifier);
+		Assertions.assertEquals(expectedIndex, idx);
 	}
 	
 	public static class Unknown {
@@ -572,7 +574,7 @@ class ChunkTest {
 		// null chunk
 		encoder.writeChunkType(ChunkType.NULL);
 		
-		// chunk for reference to UnknownClass
+		// chunk for reference to UnknownClass instance
 		encoder.writeChunkType(ChunkType.READ_OBJ_REF);
 		encoder.writeClassIndex(1);
 		
@@ -616,6 +618,58 @@ class ChunkTest {
 		Unknown expected = new Unknown();
 		expected.a = 1984;
 		expected.b = 4.2f;
+		
+		Assertions.assertNotNull(result);
+		Assertions.assertEquals(expected.getClass(), result.getClass());
+		Assertions.assertEquals(expected, result);
+	}
+	
+	public static enum UnknownEnum {
+		A, B, C;
+	}
+	
+	@Test
+	void testWriteUnknownEnum() {
+		int magicNum = bytifier.getProtocolIdentificationNumber();
+		encoder.writeInt4(magicNum);//magic number
+		encoder.writeInt1(1);// number of bytes to encode class index
+		encoder.writeInt4(0);// number of references. The instance of UnknownClass and one generic array.
+		
+		// chunk for UnknownEnum literal
+		encoder.writeChunkType(ChunkType.UNKNOWN_ENUM);
+		// write class name "edu.udo.bytifier.tests.ChunkTest$UnknownEnum"
+		String clsName = UnknownEnum.class.getName();
+		encoder.writeJavaIdentifier(clsName);
+		// write ordinal number of enum literal 'B'
+		encoder.writeIntForSize(UnknownEnum.values().length, UnknownEnum.B.ordinal());
+		
+		byte[] expected = encoder.getBytes(false);
+		
+		bytifier.setReactionToUnknownObjectTypes(UnknownObjectTypeReaction.WRITE);
+		byte[] result = bytifier.encode(UnknownEnum.B);
+		
+		Assertions.assertArrayEquals(expected, result);
+	}
+	
+	@Test
+	void testReadUnknownEnum() {
+		int magicNum = bytifier.getProtocolIdentificationNumber();
+		encoder.writeInt4(magicNum);//magic number
+		encoder.writeInt1(1);// number of bytes to encode class index
+		encoder.writeInt4(0);// number of references. The instance of UnknownClass and one generic array.
+		
+		// chunk for UnknownEnum literal
+		encoder.writeChunkType(ChunkType.UNKNOWN_ENUM);
+		// write class name "edu.udo.bytifier.tests.ChunkTest$UnknownEnum"
+		String clsName = UnknownEnum.class.getName();
+		encoder.writeJavaIdentifier(clsName);
+		// write ordinal number of enum literal 'B'
+		encoder.writeIntForSize(UnknownEnum.values().length, UnknownEnum.B.ordinal());
+		
+		byte[] bytes = encoder.getBytes(false);
+		Object result = bytifier.decode(bytes);
+		
+		UnknownEnum expected = UnknownEnum.B;
 		
 		Assertions.assertNotNull(result);
 		Assertions.assertEquals(expected.getClass(), result.getClass());

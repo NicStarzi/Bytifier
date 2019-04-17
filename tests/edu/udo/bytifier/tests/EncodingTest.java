@@ -25,11 +25,19 @@ class EncodingTest {
 	
 	@Test
 	void testWriteIntForSize() {
+		testWriteIntForSize(0, 0);
 		testWriteIntForSize(42, 1);
 		testWriteIntForSize(512, 2);
 		testWriteIntForSize(128000, 3);
 		testWriteIntForSize(Integer.MAX_VALUE / 2, 4);
 		testWriteIntForSize(Integer.MAX_VALUE, 4);
+		
+		Assertions.assertThrows(IllegalArgumentException.class, () -> {
+			DecodeData.calculateByteCountFor(-1);
+		});
+		Assertions.assertThrows(IllegalArgumentException.class, () -> {
+			DecodeData.calculateByteCountFor(Integer.MIN_VALUE);
+		});
 	}
 	
 	void testWriteIntForSize(int value, int expectedBytes) {
@@ -45,7 +53,9 @@ class EncodingTest {
 		Assertions.assertEquals(pos + expectedBytes, encoder.getPos());
 		
 		DecodeData decoder = new DecodeData(encoder.getBytes(false), false);
-		Assertions.assertEquals(value, decoder.readIntForSize(maxValue));
+		int decoded = decoder.readIntForSize(maxValue);
+		Assertions.assertTrue(decoded >= 0);
+		Assertions.assertEquals(value, decoded);
 	}
 	
 	@Test

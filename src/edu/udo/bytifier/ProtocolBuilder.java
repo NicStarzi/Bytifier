@@ -11,8 +11,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Supplier;
 
-import edu.udo.bytifier.Bytifier.ProtocolTuple;
+import edu.udo.bytifier.protocols.CollectionProtocol;
 import edu.udo.bytifier.protocols.EnumProtocol;
+import edu.udo.bytifier.protocols.MapProtocol;
 import edu.udo.bytifier.protocols.ObjectProtocol;
 import edu.udo.bytifier.protocols.PrimitiveArrays;
 import edu.udo.bytifier.protocols.ProtocolUtil;
@@ -22,18 +23,6 @@ import edu.udo.bytifier.protocols.ValueTypeArrayProtocol;
 
 public class ProtocolBuilder {
 	
-//	public static final List<ProtocolTuple> PRIMITIVE_TYPE_ARRAY_PROTOCOLS =
-//		Collections.unmodifiableList(Arrays.asList(new ProtocolTuple[]
-//		{
-//			new ProtocolTuple(byte[].class, PrimitiveArrays.BYTE_ARRAY_PROTOCOL),
-//			new ProtocolTuple(short[].class, PrimitiveArrays.SHORT_ARRAY_PROTOCOL),
-//			new ProtocolTuple(int[].class, PrimitiveArrays.INT_ARRAY_PROTOCOL),
-//			new ProtocolTuple(long[].class, PrimitiveArrays.LONG_ARRAY_PROTOCOL),
-//			new ProtocolTuple(float[].class, PrimitiveArrays.FLOAT_ARRAY_PROTOCOL),
-//			new ProtocolTuple(double[].class, PrimitiveArrays.DOUBLE_ARRAY_PROTOCOL),
-//			new ProtocolTuple(boolean[].class, PrimitiveArrays.BOOL_ARRAY_PROTOCOL),
-//			new ProtocolTuple(char[].class, PrimitiveArrays.CHAR_ARRAY_PROTOCOL),
-//		}));
 	public static final Map<Class<?>, ClassProtocol> PRIMITIVE_ARRAY_PROTOCOL_MAP = new HashMap<>();
 	static {
 		PRIMITIVE_ARRAY_PROTOCOL_MAP.put(byte[].class,		PrimitiveArrays.BYTE_ARRAY_PROTOCOL);
@@ -126,45 +115,50 @@ public class ProtocolBuilder {
 	
 	public ProtocolBuilder defineValueTypeArray(Class<?> arrayType, boolean isValueType) {
 		Class<?> elementType = ProtocolUtil.getArrayElementType(arrayType);
-		clsMap.put(arrayType, () -> new ValueTypeArrayProtocol<>(elementType, isValueType));
+		addClassProtocol(arrayType, new ValueTypeArrayProtocol<>(elementType, isValueType));
 		return this;
 	}
 	
-	public <T extends Enum<T>> ProtocolBuilder defineEnum(Class<T> enumClass) {
-		clsMap.put(enumClass, () -> new EnumProtocol<>(enumClass));
+	public <T extends Enum<T>> ProtocolBuilder defineEnum(Class<T> enumType) {
+		addClassProtocol(enumType, new EnumProtocol<>(enumType));
 		return this;
 	}
 	
 	public ProtocolBuilder defineViaReflection(Class<?> cls) {
-		clsMap.put(cls, () -> ReflectionClassProtocol.allFieldsOf(cls));
+		addClassProtocol(cls, ReflectionClassProtocol.allFieldsOf(cls));
 		return this;
 	}
 	
 	public ProtocolBuilder defineViaReflectionOnlySelectedFields(Class<?> cls, String ... fieldNames) {
-		clsMap.put(cls, () -> ReflectionClassProtocol.withFields(cls, fieldNames));
+		addClassProtocol(cls, ReflectionClassProtocol.withFields(cls, fieldNames));
 		return this;
 	}
 	
 	public ProtocolBuilder defineViaReflectionWithoutSelectedFields(Class<?> cls, String ... fieldNames) {
-		clsMap.put(cls, () -> ReflectionClassProtocol.withoutFields(cls, fieldNames));
+		addClassProtocol(cls, ReflectionClassProtocol.withoutFields(cls, fieldNames));
 		return this;
 	}
 	
 	public ProtocolBuilder defineForClass(Class<?> cls, ClassProtocol protocol) {
-		if (hasClassDefinition(cls)) {
-			throw new IllegalStateException("hasClassDefinition("+cls.getName()+") == true");
-		}
-		clsMap.put(cls, () -> protocol);
+		addClassProtocol(cls, protocol);
 		return this;
 	}
 	
 	public <T> PerClassBuilder<T> defineForClass(Class<T> cls) {
-		if (hasClassDefinition(cls)) {
-			throw new IllegalStateException("hasClassDefinition("+cls.getName()+") == true");
-		}
+		throwExcIfClsDefined(cls);
 		PerClassBuilder<T> builder = new PerClassBuilder<>(this, cls);
 		clsMap.put(cls, builder::build);
 		return builder;
+	}
+	
+	public <CT extends Collection<?>> ProtocolBuilder defineCollection(Class<CT> colType, Supplier<CT> constructor) {
+		addClassProtocol(colType, new CollectionProtocol(constructor));
+		return this;
+	}
+	
+	public <MT extends Map<?, ?>> ProtocolBuilder defineMap(Class<MT> mapType, Supplier<MT> constructor) {
+		addClassProtocol(mapType, new MapProtocol(constructor));
+		return this;
 	}
 	
 	public Bytifier build() {
@@ -175,6 +169,17 @@ public class ProtocolBuilder {
 			protocols.add(new ProtocolTuple(cls, prot));
 		}
 		return new Bytifier(protocols);
+	}
+	
+	protected void addClassProtocol(Class<?> cls, ClassProtocol proto) {
+		throwExcIfClsDefined(cls);
+		clsMap.put(cls, () -> proto);
+	}
+	
+	protected void throwExcIfClsDefined(Class<?> cls) {
+		if (hasClassDefinition(cls)) {
+			throw new IllegalStateException("hasClassDefinition("+cls.getName()+") == true");
+		}
 	}
 	
 }

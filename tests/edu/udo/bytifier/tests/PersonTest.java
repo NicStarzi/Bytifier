@@ -3,14 +3,17 @@ package edu.udo.bytifier.tests;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
+import org.junit.jupiter.api.Test;
+
 import edu.udo.bytifier.Bytifier;
 import edu.udo.bytifier.EncodeData;
 import edu.udo.bytifier.ProtocolBuilder;
+import edu.udo.bytifier.ValueType;
 
-public class Test {
+public class PersonTest {
 	
-	static class Person {
-		String name;
+	public static class Person {
+		@ValueType String name;
 		int age;
 		double salary;
 		EmployeeType type;
@@ -50,12 +53,12 @@ public class Test {
 			return name+"["+age+"]="+salary;
 		}
 	}
-	static enum EmployeeType {
+	public static enum EmployeeType {
 		PERMANENT,
 		TEMPORARY,
 		;
 	}
-	static class Box {
+	public static class Box {
 		int i = 42;
 		double d = 4.2;
 		boolean b = true;
@@ -72,9 +75,10 @@ public class Test {
 		}
 	}
 	
-	public static void runTest() {
+	@Test
+	void runTest() {
 		ProtocolBuilder protoBuilder = new ProtocolBuilder();
-		protoBuilder.setStringCharset(StandardCharsets.UTF_8);
+		protoBuilder.setStringEncodingCharset(StandardCharsets.UTF_8);
 		protoBuilder.defineEnum(EmployeeType.class);
 		protoBuilder.defineViaReflection(Box.class);
 		protoBuilder.defineForClass(Person.class)
@@ -83,14 +87,14 @@ public class Test {
 //			.addFieldString(Person::getName, Person::setName)
 //			.addFieldInt(Person::getAge, Person::setAge)
 			.addFieldDouble(Person::getSalary, Person::setSalary)
-			.addObjectByReference(Person::getType, Person::setType)
+			.addFieldReferencedObject(Person::getType, Person::setType)
 			.useFieldHashing(false)
 			;
 		
 		Bytifier bytifier = protoBuilder.build();
 		
 		EncodeData encoder = new EncodeData(bytifier, 256);
-		byte[] bytes = Test.writePersons(bytifier, encoder);
+		byte[] bytes = PersonTest.writePersons(bytifier, encoder);
 		
 		System.out.println();
 		System.out.println("byteCount="+bytes.length);
@@ -98,7 +102,7 @@ public class Test {
 		System.out.println("bytes="+Arrays.toString(bytes));
 		System.out.println();
 		
-		Test.readPersons(bytifier, bytes);
+		PersonTest.readPersons(bytifier, bytes);
 	}
 	
 	static byte[] writePersons(Bytifier bytifier, EncodeData data) {

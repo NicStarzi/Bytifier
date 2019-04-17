@@ -9,10 +9,9 @@ import edu.udo.bytifier.EncodeData;
 
 public class ArrayListProtocol implements ClassProtocol {
 	
-	@SuppressWarnings("rawtypes")
 	@Override
 	public void write(Bytifier bytifier, EncodeData data, Object object) {
-		ArrayList list = (ArrayList) object;
+		ArrayList<?> list = (ArrayList<?>) object;
 		int length = list.size();
 		data.writeInt4(length);
 		for (int i = 0; i < length; i++) {
@@ -20,10 +19,9 @@ public class ArrayListProtocol implements ClassProtocol {
 		}
 	}
 	
-	@SuppressWarnings("rawtypes")
 	@Override
 	public Object create(Bytifier bytifier, DecodeData data) {
-		return new ArrayList();
+		return new ArrayList<>();
 	}
 	
 	@SuppressWarnings({"unchecked", "rawtypes"})

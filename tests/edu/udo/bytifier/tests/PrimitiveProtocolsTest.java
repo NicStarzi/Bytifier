@@ -1,7 +1,5 @@
 package edu.udo.bytifier.tests;
 
-import java.nio.charset.StandardCharsets;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,15 +7,13 @@ import org.junit.jupiter.api.Test;
 import edu.udo.bytifier.Bytifier;
 import edu.udo.bytifier.ProtocolBuilder;
 
-class ProtocolsTest {
+class PrimitiveProtocolsTest {
 	
 	Bytifier bytifier;
 	
 	@BeforeEach
 	void setup() {
-		ProtocolBuilder protoBld = new ProtocolBuilder();
-		protoBld.setStringEncodingCharset(StandardCharsets.UTF_8);
-		bytifier = protoBld.build();
+		bytifier = new ProtocolBuilder().build();
 	}
 	
 	@Test

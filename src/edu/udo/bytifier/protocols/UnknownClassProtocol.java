@@ -15,6 +15,7 @@ import edu.udo.bytifier.Bytifier;
 import edu.udo.bytifier.ClassProtocol;
 import edu.udo.bytifier.DecodeData;
 import edu.udo.bytifier.EncodeData;
+import edu.udo.bytifier.ValueType;
 
 public class UnknownClassProtocol implements ClassProtocol {
 	
@@ -28,7 +29,8 @@ public class UnknownClassProtocol implements ClassProtocol {
 	
 	private final Map<Class<?>, WriteToField> writeDataMap = new HashMap<>();
 	private final Map<Class<?>, ReadFromField> readDataMap = new HashMap<>();
-	private final WriteToField defaultWrite = (btf, data, obj, field) -> btf.writeChunk(data, field.get(obj), false);
+	private final WriteToField writeRef = (btf, data, obj, field) -> btf.writeChunk(data, field.get(obj), false);
+	private final WriteToField writeValType = (btf, data, obj, field) -> btf.writeChunk(data, field.get(obj), true);
 	private final ReadFromField defaultRead = (btf, data, obj, field) -> field.set(obj, btf.readChunk(data));
 	{
 		writeDataMap.put(Byte.TYPE, (btf, data, obj, field) -> data.writeInt1(field.getByte(obj)));
@@ -54,7 +56,7 @@ public class UnknownClassProtocol implements ClassProtocol {
 	public void write(Bytifier bytifier, EncodeData data, Object input) {
 		try {
 			Class<?> cls = input.getClass();
-			UnknownClassProtocol.writeString(data, cls.getName());
+			data.writeJavaIdentifier(cls.getName());
 			
 			Field[] fieldArr = cls.getDeclaredFields();
 			List<Field> fields =
@@ -70,8 +72,10 @@ public class UnknownClassProtocol implements ClassProtocol {
 			
 			AccessibleObject.setAccessible(fieldArr, true);
 			for (Field field : fields) {
-				UnknownClassProtocol.writeString(data, field.getName());
-				writeFieldData(bytifier, data, input, field);
+				data.writeJavaIdentifier(field.getName());
+				boolean valueType = field.getAnnotation(ValueType.class) != null
+						||field.getType().getAnnotation(ValueType.class) != null;
+				writeFieldData(bytifier, data, input, field, valueType);
 			}
 			AccessibleObject.setAccessible(fieldArr, false);
 		} catch (Exception e) {
@@ -86,7 +90,7 @@ public class UnknownClassProtocol implements ClassProtocol {
 			
 			int fieldCount = data.readInt2();
 			for (int i = 0; i < fieldCount; i++) {
-				String fieldName = UnknownClassProtocol.readString(data);
+				String fieldName = data.readJavaIdentifier();
 				try {
 					Field field = cls.getDeclaredField(fieldName);
 					field.setAccessible(true);
@@ -103,13 +107,14 @@ public class UnknownClassProtocol implements ClassProtocol {
 	
 	@Override
 	public Object create(Bytifier bytifier, DecodeData data) {
-		String clsName = UnknownClassProtocol.readString(data);
+		String clsName = data.readJavaIdentifier();
 		try {
 			Class<?> objCls = Class.forName(clsName);
 			Constructor<?> constr = objCls.getDeclaredConstructor();
+			boolean wasAccessible = constr.isAccessible();
 			constr.setAccessible(true);
 			Object obj = constr.newInstance();
-			constr.setAccessible(false);
+			constr.setAccessible(wasAccessible);
 			return obj;
 		} catch (ClassNotFoundException
 				| InstantiationException
@@ -127,26 +132,18 @@ public class UnknownClassProtocol implements ClassProtocol {
 		throw new UnsupportedOperationException("Unknown Class Protocol must not be part of a Bytifier Protocol");
 	}
 	
-	public static void writeString(EncodeData data, String str) {
-		data.writeInt2(str.length());
-		for (int i = 0; i < str.length(); i++) {
-			data.writeInt2(str.charAt(i));
-		}
-	}
-	
-	public static String readString(DecodeData data) {
-		int strLen = data.readInt2();
-		char[] strChars = new char[strLen];
-		for (int i = 0; i < strLen; i++) {
-			strChars[i] = (char) data.readInt2();
-		}
-		String result = new String(strChars);
-		return result;
-	}
-	
-	private void writeFieldData(Bytifier bytifier, EncodeData data, Object obj, Field field) throws IllegalAccessException {
+	private void writeFieldData(
+			Bytifier bytifier,
+			EncodeData data,
+			Object obj,
+			Field field,
+			boolean valueType)
+			
+			throws IllegalAccessException
+	{
 		Class<?> fieldType = field.getType();
-		writeDataMap.getOrDefault(fieldType, defaultWrite).writeFieldData(bytifier, data, obj, field);
+		WriteToField usedDefaultWrite = valueType ? writeValType : writeRef;
+		writeDataMap.getOrDefault(fieldType, usedDefaultWrite).writeFieldData(bytifier, data, obj, field);
 	}
 	
 	private void readFieldData(Bytifier bytifier, DecodeData data, Object obj, Field field) throws IllegalAccessException {

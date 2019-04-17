@@ -8,7 +8,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class EncodeData {
+public class EncodeData implements IEncodeData {
 	
 	public static final int MIN_BUFFER_SIZE = 16;
 	
@@ -45,7 +45,7 @@ public class EncodeData {
 		}
 		
 		if (writeDefaults) {
-			writeInt4(bytifier.protoID);
+			writeInt4(bytifier.protocolID);
 			writeInt1(clsSize);
 			writeInt4(0);// place holder for reference count. Written to at a later time.
 		}
@@ -107,6 +107,7 @@ public class EncodeData {
 		return getBytes(true);
 	}
 	
+	@Override
 	public void writeIntForSize(int maxValue, int value) {
 		int byteCount = DecodeData.calculateByteCountFor(maxValue);
 		switch (byteCount) {
@@ -133,14 +134,28 @@ public class EncodeData {
 		refMap.put(object, Integer.valueOf(refIdx));
 	}
 	
+	@Override
+	public void writeReferenceIndexOf(Object object) {
+		if (object == null) {
+			throw new IllegalArgumentException("object == null");
+		}
+		Integer refIdx = refMap.get(object);
+		if (refIdx == null) {
+			throw new IllegalStateException("Unknown reference: '"+object+"'");
+		}
+		writeIntForSize(refMap.size(), refIdx.intValue());
+	}
+	
 	public void writeOldReferenceIndex(int value) {
 		writeIntForSize(refMap.size(), value);
 	}
 	
+	@Override
 	public void writeBytes(byte[] in) {
 		writeBytes(in, 0, in.length);
 	}
 	
+	@Override
 	public void writeBytes(byte[] in, int offset, int length) {
 		while (length > 0) {
 			int remaining = byteBuf.length - pos;
@@ -160,6 +175,7 @@ public class EncodeData {
 		writeBytes(primitiveBuf, 0, length);
 	}
 	
+	@Override
 	public void writeBoolean(boolean value) {
 		if (value) {
 			writeInt1(DecodeData.BOOLEAN_TRUE);
@@ -168,17 +184,20 @@ public class EncodeData {
 		}
 	}
 	
+	@Override
 	public void writeInt1(int value) {
 		primitiveBuf[0] = (byte) (value & 0xFF);
 		writePrimitives(1);
 	}
 	
+	@Override
 	public void writeInt2(int value) {
 		primitiveBuf[0] = (byte) ((value >> 0) & 0xFF);
 		primitiveBuf[1] = (byte) ((value >> 8) & 0xFF);
 		writePrimitives(2);
 	}
 	
+	@Override
 	public void writeInt3(int value) {
 		primitiveBuf[0] = (byte) ((value >> 0) & 0xFF);
 		primitiveBuf[1] = (byte) ((value >> 8) & 0xFF);
@@ -186,6 +205,7 @@ public class EncodeData {
 		writePrimitives(3);
 	}
 	
+	@Override
 	public void writeInt4(int value) {
 		primitiveBuf[0] = (byte) ((value >> 0) & 0xFF);
 		primitiveBuf[1] = (byte) ((value >> 8) & 0xFF);
@@ -201,6 +221,7 @@ public class EncodeData {
 		arr[pos++] = (byte) ((value >> 24) & 0xFF);
 	}
 	
+	@Override
 	public void writeInt8(long value) {
 		primitiveBuf[0] = (byte) ((value >> 0) & 0xFF);
 		primitiveBuf[1] = (byte) ((value >> 8) & 0xFF);
@@ -213,17 +234,28 @@ public class EncodeData {
 		writePrimitives(8);
 	}
 	
+	@Override
 	public void writeFloat4(float value) {
 		int bits = Float.floatToRawIntBits(value);
 		writeInt4(bits);
 	}
 	
+	@Override
 	public void writeFloat8(double value) {
 		long bits = Double.doubleToRawLongBits(value);
 		writeInt8(bits);
 	}
 	
+	@Override
 	public void writeChunkType(ChunkType value) {
 		writeInt1(value.ordinal());
+	}
+	
+	@Override
+	public void writeJavaIdentifier(String str) {
+		writeInt2(str.length());
+		for (int i = 0; i < str.length(); i++) {
+			writeInt2(str.charAt(i));
+		}
 	}
 }

@@ -1,4 +1,4 @@
-package edu.udo.bytifier.tests;
+package edu.udo.bytifier.tests.data;
 
 public class LinkedClass{
 	
