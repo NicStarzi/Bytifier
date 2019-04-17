@@ -4,29 +4,7 @@ import java.lang.reflect.Array;
 import java.util.Arrays;
 
 public class DecodeData {
-	/*
-- Now supports serialization and deserialization of arbitrary enum types. A new chunk type UNKNOWN_ENUM has been introduced for this purpose.
-- ProtocolTuple class has been moved to its own file. It is no longer an inner class of Bytifier.
-- Bytifier: previously public read methods have been made protected.
-- Bytifier: Error messages have been improved.
-- ChunkType: Added java doc.
-- ClassProtocol: Added java doc.
-- DecodeData: Added a readJavaIdentifier() method to the public API.
-- DecodeData: Added java doc.
-- DecodeData: Improved code readability.
-- DecodeData: Renamed several methods to give them more descriptive names.
-- EncodeData: Added a writeJavaIdentifier(String) method to the public API.
-- EncodeData: Refactored the code and split into interface and implementation.
-- PerClassBuilder: Refactored the code.
-- PerClassBuilder: Improved error messages.
-- ProtocolBuilder: Refactored the code.
-- ProtocolBuilder: Added more convenience methods. Now serialization of Collections and Maps can more easily be defined.
-- ArrayListProtocol, CollectionProtocol: Removed unnecessary generics and @SuppressWarnings annotations.
-- MapProtocol: Added a default ClassProtocol implementation for arbitrary Maps.
-- ReflectionClassProtocol, UnknownClassProtocol, @ValueType: Added the @ValueType annotation to denote classes or attributes as value types. When using the ReflectionClassProtocol or the UnknownClassProtocol the annotation will be usd to determine whether to write an object by reference or by value.
-- ReflectionClassProtocol, UnknownClassProtocol: Refactored the code.
-- Test-Cases: Added more tests and improved existing test-cases.
-	 */
+	
 	public static final byte BOOLEAN_TRUE = 0b01010101;
 	public static final int MAX_INT_1 = (1 << (8 * 1));
 	public static final int MAX_INT_2 = (1 << (8 * 2));
