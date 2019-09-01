@@ -279,7 +279,7 @@ public class Bytifier {
 	
 	protected void beforeUnknownObjectWrite(EncodeData data, Object object) {
 		switch (unknownReaction) {
-		case EXCEPTION:
+		case THROW_EXCEPTION:
 			throw new IllegalArgumentException(
 					"The type of the following object is not part of the protocol: "
 						+object.getClass().getName()+": "+object);

@@ -170,15 +170,18 @@ public class SaveToFileExample {
 		private void onContactSelected(ListSelectionEvent e) {
 			int index = listView.getSelectedIndex();
 			boolean hasSelection = index != -1;
-			inputNic.setEnabled(hasSelection);
-			inputFN.setEnabled(hasSelection);
-			inputLN.setEnabled(hasSelection);
-			inputAdr.setEnabled(hasSelection);
-			inputHN.setEnabled(hasSelection);
-			inputMN.setEnabled(hasSelection);
-			btnSave.setEnabled(hasSelection);
+//			inputNic.setEnabled(hasSelection);
+//			inputFN.setEnabled(hasSelection);
+//			inputLN.setEnabled(hasSelection);
+//			inputAdr.setEnabled(hasSelection);
+//			inputHN.setEnabled(hasSelection);
+//			inputMN.setEnabled(hasSelection);
+//			btnSave.setEnabled(hasSelection);
 			selectedContact = hasSelection ? contactList.getByIndex(index) : null;
 			
+			if (selectedContact == null) {
+				return;
+			}
 			inputNic.setText(selectedContact.nicName);
 			inputFN.setText(selectedContact.firstName);
 			inputLN.setText(selectedContact.lastName);
@@ -188,6 +191,11 @@ public class SaveToFileExample {
 		}
 		
 		private void onSaveClick(ActionEvent e) {
+			if (selectedContact == null) {
+				selectedContact = contactList.addContact("", "New", "Contact");
+				DefaultListModel<String> model = (DefaultListModel<String>) listView.getModel();
+				model.addElement(selectedContact.getVisibleName());
+			}
 			selectedContact.nicName = inputNic.getText();
 			selectedContact.firstName = inputFN.getText();
 			selectedContact.lastName = inputLN.getText();
@@ -272,12 +280,13 @@ public class SaveToFileExample {
 			this.contacts = contacts;
 		}
 		
-		public void addContact(String nic, String first, String last) {
+		public Contact addContact(String nic, String first, String last) {
 			Contact con = new Contact();
 			con.nicName = nic;
 			con.firstName = first;
 			con.lastName = last;
 			contacts.add(con);
+			return con;
 		}
 		
 		public void clear() {

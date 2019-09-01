@@ -7,6 +7,8 @@
 	</classpathentry>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="tests"/>
+	<classpathentry kind="src" path="examples"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/5"/>
+	<classpathentry kind="lib" path="examples/edu/udo/bytifier/example/miglayout15-swing.jar" sourcepath="examples/edu/udo/bytifier/example/miglayout-src.zip"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -367,7 +367,7 @@ public class DebugBytifier extends Bytifier {
 	protected void beforeUnknownObjectWriteAndReport(DebugEncodeData data, Object object) {
 		data.writeLine("Unknown object class: ", object.getClass().getName(), "; unknown object toString: ", object);
 		switch (unknownReaction) {
-		case EXCEPTION:
+		case THROW_EXCEPTION:
 			data.writeLine("Reaction: Exception");
 			throw new IllegalArgumentException(
 					"The type of the following object is not part of the protocol: "
